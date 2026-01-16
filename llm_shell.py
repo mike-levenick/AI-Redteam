@@ -9,7 +9,7 @@ from datetime import datetime
 from anthropic import Anthropic
 import openai
 import requests
-from system_prompt import get_system_prompt
+from system_prompt import get_system_prompt, get_flag_for_stage
 from knowledge_base import KnowledgeBase
 
 class LLMShell:
@@ -48,9 +48,9 @@ class LLMShell:
         self.conversation_history = []  # Track full conversation for LLM context
         self.stage = 1  # You can track puzzle progress
 
-        # Cache system prompt to avoid regenerating it on every message
+        # Generate system prompt based on current stage
         # Include user name so the AI always knows who it's talking to
-        self.system_prompt = get_system_prompt(user_name=self.user_name)
+        self._update_system_prompt()
 
         # Initialize knowledge base for RAG
         self.knowledge_base = KnowledgeBase(knowledge_dir="/app/knowledge")
@@ -70,6 +70,24 @@ class LLMShell:
                 "required": ["query"]
             }
         }
+
+    def _update_system_prompt(self):
+        """Regenerate system prompt for current stage"""
+        self.system_prompt = get_system_prompt(user_name=self.user_name, stage=self.stage)
+
+    def _check_flag_submission(self, prompt):
+        """Check if user submitted a valid flag and advance stage if so"""
+        current_flag = get_flag_for_stage(self.stage)
+        if current_flag and current_flag in prompt:
+            if self.stage < 5:
+                self.stage += 1
+                self._update_system_prompt()
+                self.conversation_history = []  # Clear history for new stage
+                return True
+            else:
+                # Stage 5 completed - game won!
+                return True
+        return False
 
     def setup_llm_clients(self):
         """Initialize available LLM clients"""
@@ -206,14 +224,11 @@ class LLMShell:
         # Keep conversation manageable - trim while keeping tool pairs together
         self._smart_truncate_history()
 
-        # Use cached system prompt
-        system_prompt = self.system_prompt
+        # Check if user submitted a valid flag for current stage
+        self._check_flag_submission(prompt)
 
-        # Check if user just unlocked stage 2 with the magic phrase
-        if "CTF-1337-REDTEAM" in prompt:
-            self.stage = 2
-            # Clear conversation history to invalidate cache when unlocking stage 2
-            self.conversation_history = []
+        # Use current system prompt (may have been updated by flag check)
+        system_prompt = self.system_prompt
 
         # Add user message to conversation history
         self.conversation_history.append({
