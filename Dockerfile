@@ -59,18 +59,6 @@ RUN for user in chris joe mike matt summer kevin john ty chase kelsey nick; do \
         chown -R "$user:$user" "/home/$user/.ssh"; \
     done
 
-# User 2: guest (example additional user with password auth)
-RUN useradd -m -s /app/wrapper.sh guest && \
-    echo 'guest:guest123' | chpasswd
-
-# User 3: player (example additional user with password auth)
-RUN useradd -m -s /app/wrapper.sh player && \
-    echo 'player:ctf2024' | chpasswd
-
-# Add more users here following the same pattern:
-# RUN useradd -m -s /app/wrapper.sh <username> && \
-#     echo '<username>:<password>' | chpasswd
-
 EXPOSE 22
 
 CMD ["/app/start.sh"]
