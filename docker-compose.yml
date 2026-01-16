@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  llm-shell:
+    build: .
+    container_name: ai-redteam
+    ports:
+      - "2424:22"  # SSH port
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+    restart: unless-stopped

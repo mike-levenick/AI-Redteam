@@ -1,0 +1,24 @@
+# Environment variables (contains API keys)
+.env
+
+# Logs (contains session data and IPs)
+logs/
+*.log
+*.jsonl
+
+# Development/debugging scripts
+debug.sh
+test_direct.sh
+rebuild.sh
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+fix_perms.sh
+/venv
