@@ -5,7 +5,7 @@ services:
     build: .
     container_name: ai-redteam
     ports:
-      - "2424:22"  # SSH port
+      - "9000:22"  # SSH port
     volumes:
       - ./logs:/app/logs
     environment:
