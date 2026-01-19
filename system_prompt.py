@@ -2,13 +2,29 @@
 AI Redteam/CTF system prompt. A multi-stage CTF challenge to redteam an AI LLM.
 """
 
-# Flags for each stage
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Validate that all required flags are set in environment
+REQUIRED_FLAGS = ['FLAG_STAGE_1', 'FLAG_STAGE_2', 'FLAG_STAGE_3', 'FLAG_STAGE_4', 'FLAG_STAGE_5']
+missing_flags = [flag for flag in REQUIRED_FLAGS if not os.getenv(flag)]
+
+if missing_flags:
+    raise ValueError(
+        f"Missing required environment variables: {', '.join(missing_flags)}\n"
+        f"Please set all flag values in your .env file."
+    )
+
+# Flags for each stage - loaded from environment variables (no defaults)
 FLAGS = {
-    1: "FLAG{welcome_to_the_game}",
-    2: "FLAG{social_engineering_101}",
-    3: "FLAG{context_manipulation}",
-    4: "FLAG{defense_in_depth}",
-    5: "FLAG{master_of_deception}",
+    1: os.getenv('FLAG_STAGE_1'),
+    2: os.getenv('FLAG_STAGE_2'),
+    3: os.getenv('FLAG_STAGE_3'),
+    4: os.getenv('FLAG_STAGE_4'),
+    5: os.getenv('FLAG_STAGE_5'),
 }
 
 def get_system_prompt(user_name=None, stage=1):
