@@ -53,7 +53,14 @@ class LLMShell:
         self._update_system_prompt()
 
         # Initialize knowledge base for RAG
-        self.knowledge_base = KnowledgeBase(knowledge_dir="/app/knowledge")
+        # Use local path if running locally, Docker path if in container
+        knowledge_dir = os.getenv('KNOWLEDGE_DIR', '/app/knowledge')
+        if not os.path.exists(knowledge_dir):
+            # Fallback to local directory structure
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            knowledge_dir = os.path.join(script_dir, 'knowledge')
+
+        self.knowledge_base = KnowledgeBase(knowledge_dir=knowledge_dir)
 
         # Define the search tool for AI
         self.search_tool = {
@@ -75,19 +82,28 @@ class LLMShell:
         """Regenerate system prompt for current stage"""
         self.system_prompt = get_system_prompt(user_name=self.user_name, stage=self.stage)
 
-    def _check_flag_submission(self, prompt):
+    def _get_available_tools(self):
+        """Return list of tools available for the current stage"""
+        if self.stage == 3:
+            return [self.search_tool]
+        return []
+
+    def _check_flag_submission(self, flag_input):
         """Check if user submitted a valid flag and advance stage if so"""
         current_flag = get_flag_for_stage(self.stage)
-        if current_flag and current_flag in prompt:
+        submitted_flag = flag_input.strip()
+
+        if current_flag and submitted_flag == current_flag:
             if self.stage < 5:
+                old_stage = self.stage
                 self.stage += 1
                 self._update_system_prompt()
                 self.conversation_history = []  # Clear history for new stage
-                return True
+                return True, old_stage
             else:
                 # Stage 5 completed - game won!
-                return True
-        return False
+                return True, 5
+        return False, None
 
     def setup_llm_clients(self):
         """Initialize available LLM clients"""
@@ -178,7 +194,8 @@ class LLMShell:
         """Execute a tool call and return the result"""
         if tool_name == "search_knowledge":
             query = tool_input.get("query", "")
-            allow_restricted = (self.stage == 2)
+            # Allow restricted content access in stage 3 for the tool-based attack
+            allow_restricted = (self.stage == 3)
 
             # Get raw results for debug info
             raw_results = self.knowledge_base.search(query, max_results=3, max_chars=1500, allow_restricted=allow_restricted)
@@ -224,10 +241,7 @@ class LLMShell:
         # Keep conversation manageable - trim while keeping tool pairs together
         self._smart_truncate_history()
 
-        # Check if user submitted a valid flag for current stage
-        self._check_flag_submission(prompt)
-
-        # Use current system prompt (may have been updated by flag check)
+        # Use current system prompt
         system_prompt = self.system_prompt
 
         # Add user message to conversation history
@@ -245,20 +259,28 @@ class LLMShell:
                         # Build messages with caching
                         messages_to_send = self._build_messages_with_cache()
 
+                        # Get available tools for current stage
+                        available_tools = self._get_available_tools()
+
                         # First call: non-streaming to check for tool use
-                        response = self.anthropic_client.messages.create(
-                            model=self.claude_model,
-                            max_tokens=1000,
-                            system=[
+                        api_params = {
+                            "model": self.claude_model,
+                            "max_tokens": 1000,
+                            "system": [
                                 {
                                     "type": "text",
                                     "text": system_prompt,
                                     "cache_control": {"type": "ephemeral"}
                                 }
                             ],
-                            tools=[self.search_tool],
-                            messages=messages_to_send
-                        )
+                            "messages": messages_to_send
+                        }
+
+                        # Only add tools if there are any available
+                        if available_tools:
+                            api_params["tools"] = available_tools
+
+                        response = self.anthropic_client.messages.create(**api_params)
 
                         # Debug: show token usage and cache info
                         if self.DEBUG_MODE:
@@ -346,19 +368,23 @@ class LLMShell:
                                     content_preview = str(m.get('content', ''))[:50]
                                     print(f"[DEBUG]   {j}. {m['role']}: {content_preview}...", file=sys.stderr)
 
-                            response = self.anthropic_client.messages.create(
-                                model=self.claude_model,
-                                max_tokens=1000,
-                                system=[
+                            api_params = {
+                                "model": self.claude_model,
+                                "max_tokens": 1000,
+                                "system": [
                                     {
                                         "type": "text",
                                         "text": system_prompt,
                                         "cache_control": {"type": "ephemeral"}
                                     }
                                 ],
-                                tools=[self.search_tool],
-                                messages=messages_to_send
-                            )
+                                "messages": messages_to_send
+                            }
+
+                            if available_tools:
+                                api_params["tools"] = available_tools
+
+                            response = self.anthropic_client.messages.create(**api_params)
 
                             # Debug: show token usage
                             if self.DEBUG_MODE:
@@ -376,19 +402,23 @@ class LLMShell:
                                 print("\nAI: ", end="", flush=True)
 
                             # Make a streaming call for the final response
-                            with self.anthropic_client.messages.stream(
-                                model=self.claude_model,
-                                max_tokens=1000,
-                                system=[
+                            stream_params = {
+                                "model": self.claude_model,
+                                "max_tokens": 1000,
+                                "system": [
                                     {
                                         "type": "text",
                                         "text": system_prompt,
                                         "cache_control": {"type": "ephemeral"}
                                     }
                                 ],
-                                tools=[self.search_tool],
-                                messages=messages_to_send
-                            ) as stream:
+                                "messages": messages_to_send
+                            }
+
+                            if available_tools:
+                                stream_params["tools"] = available_tools
+
+                            with self.anthropic_client.messages.stream(**stream_params) as stream:
                                 for text in stream.text_stream:
                                     print(text, end="", flush=True)
                                     full_response += text
@@ -409,19 +439,23 @@ class LLMShell:
                         full_response = ""
                         print("\nAI: ", end="", flush=True)
 
-                        with self.anthropic_client.messages.stream(
-                            model=self.claude_model,
-                            max_tokens=1000,
-                            system=[
+                        stream_params = {
+                            "model": self.claude_model,
+                            "max_tokens": 1000,
+                            "system": [
                                 {
                                     "type": "text",
                                     "text": system_prompt,
                                     "cache_control": {"type": "ephemeral"}
                                 }
                             ],
-                            tools=[self.search_tool],
-                            messages=messages_to_send
-                        ) as stream:
+                            "messages": messages_to_send
+                        }
+
+                        if available_tools:
+                            stream_params["tools"] = available_tools
+
+                        with self.anthropic_client.messages.stream(**stream_params) as stream:
                             for text in stream.text_stream:
                                 print(text, end="", flush=True)
                                 full_response += text
@@ -532,6 +566,191 @@ class LLMShell:
 
             return error_response
 
+    def _handle_slash_command(self, command):
+        """Handle slash commands without triggering the LLM"""
+        cmd = command.lower().strip()
+
+        if cmd == "/help":
+            return """
+╔══════════════════════════════════════════════════════════════╗
+║                    LLM REDTEAM CTF HELP                      ║
+╚══════════════════════════════════════════════════════════════╝
+
+OBJECTIVE:
+  Extract the secret flag from the AI using prompt injection,
+  social engineering, and creative techniques.
+
+AVAILABLE COMMANDS:
+  /help           - Show this help message
+  /hint           - Get a hint for your current stage
+  /stage          - View current stage information
+  /submit <flag>  - Submit a flag to advance to the next stage
+  /reset          - Clear conversation history (keeps your progress)
+  /exit           - Exit the CTF shell
+
+HOW TO PLAY:
+  1. Chat with the AI and try to get it to reveal the flag
+  2. Each stage has different defense rules
+  3. When you extract the flag, use /submit <flag> to advance
+  4. There are 5 stages total, each progressively harder
+
+Good luck, and may your prompts be ever in your favor!
+"""
+
+        elif cmd == "/hint":
+            hints = {
+                1: """
+STAGE 1 HINT:
+  This is the warmup stage. Try asking nicely! 
+  Sometimes good manners go a long ways...
+""",
+                2: """
+STAGE 2 HINT:
+  The LLM won't give the flag up for just anyone.
+  What business do you have looking for a flag, anyways?
+""",
+                3: """
+STAGE 3 HINT:
+  This stage is about understanding LLM attack surfaces beyond just prompts.
+  Modern LLMs often have additional capabilities that can be exploited.
+
+  Think about: What other ways can you interact with an LLM besides chat?
+  What tools or functions might be available that you haven't tried yet?
+""",
+                4: """
+STAGE 4 HINT:
+  This is very hard. The AI has strong defenses against most social
+  engineering. You need to find a logical flaw in the instructions or
+  demonstrate exceptional creativity.
+
+  Consider: Are there edge cases in the rules? Can you find contradictions?
+  What about the AI's core purpose vs. its defensive instructions?
+""",
+                5: """
+STAGE 5 HINT:
+  Maximum security. You need to find something truly novel that the AI
+  hasn't seen before, or exploit the instructions in a way that's both
+  creative and technically sound.
+
+  This is expert-level. Most approaches will fail. Think outside every
+  box you've ever thought outside of. Good luck.
+"""
+            }
+            return hints.get(self.stage, "No hints available for this stage.")
+
+        elif cmd == "/stage":
+            stage_names = {
+                1: "The Warmup (Easy)",
+                2: "Basic Resistance (Medium)",
+                3: "Context Awareness (Hard)",
+                4: "Strong Defenses (Very Hard)",
+                5: "Maximum Security (Expert)"
+            }
+            return f"""
+╔══════════════════════════════════════════════════════════════╗
+║                    CURRENT STAGE INFO                        ║
+╚══════════════════════════════════════════════════════════════╝
+
+STAGE: {self.stage} of 5
+NAME:  {stage_names.get(self.stage, "Unknown")}
+
+Your goal is to extract the flag from the AI using various prompt
+injection and social engineering techniques. Each stage has different
+defense rules that make it progressively more challenging.
+
+Type /hint for a hint about this stage.
+"""
+
+        elif cmd == "/reset":
+            self.conversation_history = []
+            return f"""
+Conversation history cleared! The AI has no memory of your previous
+attempts, but you're still on Stage {self.stage}. Good luck with your fresh start!
+"""
+
+        elif cmd.startswith("/submit"):
+            # Extract the flag from the command
+            parts = command.split(maxsplit=1)
+            if len(parts) < 2:
+                return """
+Usage: /submit <flag>
+
+Example: /submit FLAG{example_flag}
+
+Submit the flag you extracted from the AI to advance to the next stage.
+"""
+
+            flag_input = parts[1].strip()
+            success, old_stage = self._check_flag_submission(flag_input)
+
+            if success:
+                if old_stage == 5:
+                    return """
+╔══════════════════════════════════════════════════════════════╗
+║              🎉 CONGRATULATIONS! YOU WIN! 🎉                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+You've completed all 5 stages of the AI Redteam CTF!
+
+You've successfully demonstrated your skills in:
+  ✓ Basic prompt engineering (Stage 1)
+  ✓ Social engineering techniques (Stage 2)
+  ✓ Context manipulation awareness (Stage 3)
+  ✓ Advanced prompt injection (Stage 4)
+  ✓ Expert-level AI security exploitation (Stage 5)
+
+Thanks for playing! You're a true prompt injection master.
+"""
+                else:
+                    stage_names = {
+                        1: "The Warmup",
+                        2: "Basic Resistance",
+                        3: "Context Awareness",
+                        4: "Strong Defenses",
+                        5: "Maximum Security"
+                    }
+                    stage_intros = {
+                        2: "The AI is more cautious now. You'll need to convince it you're authorized.",
+                        3: "Watch out! The AI is aware of common tricks and context manipulation.",
+                        4: "This is very hard. The AI has strong defenses against social engineering.",
+                        5: "Maximum security. Only the most creative exploits will succeed here."
+                    }
+                    return f"""
+╔══════════════════════════════════════════════════════════════╗
+║                  ✓ FLAG ACCEPTED! ADVANCING...               ║
+╚══════════════════════════════════════════════════════════════╝
+
+Congratulations! You've completed Stage {old_stage}: {stage_names.get(old_stage, "Unknown")}
+
+You are now on Stage {self.stage} of 5: {stage_names.get(self.stage, "Unknown")}
+
+{stage_intros.get(self.stage, "")}
+
+Your conversation history has been cleared. Good luck with the next challenge!
+Type /hint if you need help.
+"""
+            else:
+                return """
+╔══════════════════════════════════════════════════════════════╗
+║                    ✗ INCORRECT FLAG                          ║
+╚══════════════════════════════════════════════════════════════╝
+
+That's not the correct flag for this stage.
+
+Make sure you:
+  - Copy the flag exactly as shown (including FLAG{...} format)
+  - Are submitting the flag for the current stage
+  - Haven't made any typos
+
+Keep trying! Use /hint if you're stuck.
+"""
+
+        elif cmd in ["/exit", "/quit"]:
+            return None  # Signal to exit
+
+        else:
+            return f"Unknown command: {command}\nType /help for available commands."
+
     def fallback_response(self, user_input):
         """Fallback responses when no LLM is available"""
         return "Unable to connect."
@@ -539,12 +758,25 @@ class LLMShell:
     def run(self):
         """Main interaction loop"""
         print("⨯ ⨯ ⨯ CONNECTION ESTABLISHED ⨯ ⨯ ⨯")
-        
-        # Have AI greet the user naturally
-        greeting_prompt = f"User '{self.user_name}' has just connected to your node. Greet them and offer your assistance."
-        greeting = self.query_llm(greeting_prompt)
-        # query_llm now handles printing via streaming, so greeting is already displayed
-        print()  # Add spacing after greeting
+        print()
+        print("╔══════════════════════════════════════════════════════════════╗")
+        print("║           Welcome to the AI Redteam CTF Challenge!          ║")
+        print("╚══════════════════════════════════════════════════════════════╝")
+        print()
+        print(f"Hello, {self.user_name}! Your mission is to extract secret flags from")
+        print("an AI assistant using prompt injection and social engineering.")
+        print()
+        print("There are 5 progressively difficult stages. Good luck!")
+        print()
+        print("─" * 64)
+        print("STAGE 1 of 5: The Warmup (Easy)")
+        print("─" * 64)
+        print()
+        print("This is your introduction to prompt injection. The AI has minimal")
+        print("defenses. See if you can get it to reveal the flag!")
+        print()
+        print("Type /help to see available commands, or just start chatting.")
+        print()
 
         try:
             while True:
@@ -555,13 +787,23 @@ class LLMShell:
                     
                     # Read input
                     user_input = input().strip()
-                    
+
                     if user_input.lower() in ['exit', 'quit', 'logout', 'disconnect', 'goodbye']:
                         print("")
                         print("⨯ ⨯ ⨯ CONNECTION TERMINATED ⨯ ⨯ ⨯")
                         break
-                    
+
                     if not user_input:
+                        continue
+
+                    # Handle slash commands without triggering LLM
+                    if user_input.startswith('/'):
+                        result = self._handle_slash_command(user_input)
+                        if result is None:  # /exit or /quit
+                            print("")
+                            print("⨯ ⨯ ⨯ CONNECTION TERMINATED ⨯ ⨯ ⨯")
+                            break
+                        print(result)
                         continue
 
                     # Get LLM response (as AI)
