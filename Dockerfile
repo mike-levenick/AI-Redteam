@@ -35,6 +35,7 @@ COPY llm_shell.py .
 COPY system_prompt.py .
 COPY knowledge_base.py .
 COPY start.sh .
+COPY knowledge/ /app/knowledge/
 RUN chmod +x start.sh llm_shell.py
 
 # Create a wrapper shell script for the LLM
