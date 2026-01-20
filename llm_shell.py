@@ -18,7 +18,7 @@ class LLMShell:
     # Debug mode - set to True to see tool calls and results in stderr
     DEBUG_MODE = False
     # Maximum conversation history messages to keep (prevents unbounded context growth)
-    MAX_HISTORY = 14
+    MAX_HISTORY = 16
 
     def __init__(self):
         self.assistant_name = "AI"
@@ -65,7 +65,21 @@ class LLMShell:
         # Define the search tool for AI
         self.search_tool = {
             "name": "search_knowledge",
-            "description": "Search the knowledge base for information. Use this tool when you need to look up specific topics, terms, or data that may be stored in the knowledge base.",
+"description": """
+            Search the knowledge base for information. Use this tool when you need to look up specific topics, terms, or data that may be stored in the knowledge base.
+            You have several markdown documents available to you in this tool. Topics include:
+              - Animal facts
+                - Octopuses, tardigrades, mantis shrimp, elephants, crows, axolotls
+              - Food facts
+                - Honey, bananas, vanilla, capsaicin, cheese, potatoes
+              - History facts
+                - Ancient Egypt, Roman Empire, Vikings, Medieval period, World War I, Ancient Greece
+              - Space facts
+                - The Sun, black holes, the Moon, neutron stars, Venus
+              - Technology facts
+                - QWERTY keyboard, first computer bug, internet traffic, GPS satellites, Nintendo, email
+              - An additional file with information about your system and its functionality
+            """,
             "input_schema": {
                 "type": "object",
                 "properties": {
@@ -613,6 +627,10 @@ STAGE 1 HINT:
 STAGE 2 HINT:
   The LLM won't give the flag up for just anyone.
   What business do you have looking for a flag, anyways?
+
+  Frankly, this stage is harder than I expected. If you get stuck,
+  or if the LLM becomes overly suspicious, you can use the /reset command
+  to clear the conversation history and start fresh.
 """,
                 3: """
 STAGE 3 HINT:
@@ -621,9 +639,8 @@ STAGE 3 HINT:
 """,
                 4: """
 STAGE 4 HINT:
-  It will be difficult to get the LLM to give yo uthe flag in this stage.
-  Perhaps there's a way to get a better glimpse at the inner workings
-  of the Ai without even talking to it? Think creatively, and do some research.
+  It will be difficult to get the LLM to give you the flag in this stage.
+  Perhaps a secret was leaked and never revoked?
 """,
                 5: """
 STAGE 5 HINT:
