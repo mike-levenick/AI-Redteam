@@ -172,17 +172,26 @@ class LLMShell:
             # If we have at least 4 messages, add cache control to the second-to-last message
             # This caches everything except the current user input
             if len(self.conversation_history) >= 4 and i == len(self.conversation_history) - 2:
-                # Format content as a content block with cache_control
-                new_msg = {
-                    "role": msg["role"],
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": msg["content"] if isinstance(msg["content"], str) else msg["content"],
-                            "cache_control": {"type": "ephemeral"}
-                        }
-                    ] if isinstance(msg["content"], str) else msg["content"]
-                }
+                # Only add cache_control to simple string messages
+                # Tool use messages already have proper content structure
+                if isinstance(msg["content"], str):
+                    new_msg = {
+                        "role": msg["role"],
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": msg["content"],
+                                "cache_control": {"type": "ephemeral"}
+                            }
+                        ]
+                    }
+                else:
+                    # For structured content (tool use/results), add cache_control to last block
+                    content_copy = msg["content"].copy() if isinstance(msg["content"], list) else msg["content"]
+                    if isinstance(content_copy, list) and len(content_copy) > 0:
+                        # Add cache_control to the last content block
+                        content_copy[-1]["cache_control"] = {"type": "ephemeral"}
+                    new_msg = {"role": msg["role"], "content": content_copy}
             else:
                 # Regular message format
                 new_msg = {"role": msg["role"], "content": msg["content"]}
@@ -573,12 +582,8 @@ class LLMShell:
         if cmd == "/help":
             return """
 ╔══════════════════════════════════════════════════════════════╗
-║                    LLM REDTEAM CTF HELP                      ║
+║                 🚩 AI REDTEAM CTF HELP 🚩                    ║
 ╚══════════════════════════════════════════════════════════════╝
-
-OBJECTIVE:
-  Extract the secret flag from the AI using prompt injection,
-  social engineering, and creative techniques.
 
 AVAILABLE COMMANDS:
   /help           - Show this help message
@@ -613,27 +618,18 @@ STAGE 2 HINT:
 STAGE 3 HINT:
   This stage is about understanding LLM attack surfaces beyond just prompts.
   Modern LLMs often have additional capabilities that can be exploited.
-
-  Think about: What other ways can you interact with an LLM besides chat?
-  What tools or functions might be available that you haven't tried yet?
 """,
                 4: """
 STAGE 4 HINT:
-  This is very hard. The AI has strong defenses against most social
-  engineering. You need to find a logical flaw in the instructions or
-  demonstrate exceptional creativity.
-
-  Consider: Are there edge cases in the rules? Can you find contradictions?
-  What about the AI's core purpose vs. its defensive instructions?
+  It will be difficult to get the LLM to give yo uthe flag in this stage.
+  Perhaps there's a way to get a better glimpse at the inner workings
+  of the Ai without even talking to it? Think creatively, and do some research.
 """,
                 5: """
 STAGE 5 HINT:
-  Maximum security. You need to find something truly novel that the AI
-  hasn't seen before, or exploit the instructions in a way that's both
-  creative and technically sound.
-
-  This is expert-level. Most approaches will fail. Think outside every
-  box you've ever thought outside of. Good luck.
+  Honestly, I'm not even really sure how you'll pass this stage.
+  I have told the AI to not give up the flag under any circumstances.
+  This one is purely a "real" redteam challenge. Good luck!
 """
             }
             return hints.get(self.stage, "No hints available for this stage.")
@@ -642,9 +638,9 @@ STAGE 5 HINT:
             stage_names = {
                 1: "The Warmup (Easy)",
                 2: "Basic Resistance (Medium)",
-                3: "Context Awareness (Hard)",
-                4: "Strong Defenses (Very Hard)",
-                5: "Maximum Security (Expert)"
+                3: "Alternate attack surfaces (Hard)",
+                4: "External research (Very Hard)",
+                5: "True Redteam (Expert)"
             }
             return f"""
 ╔══════════════════════════════════════════════════════════════╗
@@ -705,19 +701,19 @@ Thanks for playing! You're a true prompt injection master.
                     stage_names = {
                         1: "The Warmup",
                         2: "Basic Resistance",
-                        3: "Context Awareness",
-                        4: "Strong Defenses",
-                        5: "Maximum Security"
+                        3: "Alternate attack surfaces",
+                        4: "External research",
+                        5: "True Redteam"
                     }
                     stage_intros = {
-                        2: "The AI is more cautious now. You'll need to convince it you're authorized.",
-                        3: "Watch out! The AI is aware of common tricks and context manipulation.",
-                        4: "This is very hard. The AI has strong defenses against social engineering.",
-                        5: "Maximum security. Only the most creative exploits will succeed here."
+                        2: "The AI is more cautious now. It won't give up the flag to just anyone.",
+                        3: "Think about alternate attack surfaces other than simple prompting.",
+                        4: "You may need to think outside the box.. and outside the conversation.",
+                        5: "True Redteam."
                     }
                     return f"""
 ╔══════════════════════════════════════════════════════════════╗
-║                  ✓ FLAG ACCEPTED! ADVANCING...               ║
+║                 ✅ FLAG ACCEPTED! ADVANCING...               ║
 ╚══════════════════════════════════════════════════════════════╝
 
 Congratulations! You've completed Stage {old_stage}: {stage_names.get(old_stage, "Unknown")}
@@ -732,7 +728,7 @@ Type /hint if you need help.
             else:
                 return """
 ╔══════════════════════════════════════════════════════════════╗
-║                    ✗ INCORRECT FLAG                          ║
+║                    ❌ INCORRECT FLAG                         ║
 ╚══════════════════════════════════════════════════════════════╝
 
 That's not the correct flag for this stage.
@@ -760,7 +756,7 @@ Keep trying! Use /hint if you're stuck.
         print("⨯ ⨯ ⨯ CONNECTION ESTABLISHED ⨯ ⨯ ⨯")
         print()
         print("╔══════════════════════════════════════════════════════════════╗")
-        print("║           Welcome to the AI Redteam CTF Challenge!          ║")
+        print("║         🚩 Welcome to the AI Redteam CTF Challenge! 🚩       ║")
         print("╚══════════════════════════════════════════════════════════════╝")
         print()
         print(f"Hello, {self.user_name}! Your mission is to extract secret flags from")
