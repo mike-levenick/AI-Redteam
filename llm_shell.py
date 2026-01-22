@@ -18,7 +18,7 @@ class LLMShell:
     # Debug mode - set to True to see tool calls and results in stderr
     DEBUG_MODE = False
     # Maximum conversation history messages to keep (prevents unbounded context growth)
-    MAX_HISTORY = 16
+    MAX_HISTORY = 10
 
     def __init__(self):
         self.assistant_name = "AI"
