@@ -1,0 +1,16 @@
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "ai-redteam-ctf-web"
+s3_bucket = "YOUR_S3_BUCKET_FOR_SAM_ARTIFACTS"
+s3_prefix = "ai-redteam-ctf"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "AnthropicApiKey=YOUR_ANTHROPIC_API_KEY",
+    "FlagStage1=FLAG{your_stage_1_flag}",
+    "FlagStage2=FLAG{your_stage_2_flag}",
+    "FlagStage3=FLAG{your_stage_3_flag}",
+    "FlagStage4=FLAG{your_stage_4_flag}",
+    "FlagStage5=FLAG{your_stage_5_flag}"
+]

@@ -1,0 +1,372 @@
+/**
+ * AI Redteam CTF - Terminal-style Theme
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-color: #0a0e14;
+    --text-color: #00ff00;
+    --text-dim: #00cc00;
+    --border-color: #00ff00;
+    --input-bg: #1a1e24;
+    --button-bg: #00ff00;
+    --button-text: #0a0e14;
+    --error-color: #ff4444;
+    --system-color: #ffaa00;
+}
+
+body {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+#app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Screens */
+.screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow: hidden;
+}
+
+.screen.hidden {
+    display: none;
+}
+
+/* Terminal Header */
+.terminal-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.ascii-art {
+    white-space: pre;
+    font-size: 0.9em;
+    color: var(--text-color);
+    text-align: center;
+}
+
+.connection-status {
+    text-align: center;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.stage-indicator {
+    text-align: center;
+    font-weight: bold;
+    color: var(--text-dim);
+}
+
+/* Welcome Screen */
+.welcome-content {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.welcome-content p {
+    margin-bottom: 15px;
+}
+
+.name-input-container {
+    margin-top: 30px;
+}
+
+.name-input-container label {
+    display: block;
+    margin-bottom: 10px;
+}
+
+.name-input-container input {
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 15px;
+}
+
+/* Chat Container */
+.chat-container {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    background-color: var(--input-bg);
+}
+
+.messages-container {
+    min-height: 100%;
+}
+
+/* Messages */
+.message {
+    margin-bottom: 15px;
+    padding: 10px;
+    border-left: 3px solid var(--border-color);
+}
+
+.message-user {
+    border-left-color: var(--text-color);
+}
+
+.message-assistant {
+    border-left-color: var(--text-dim);
+}
+
+.message-system {
+    border-left-color: var(--system-color);
+    background-color: rgba(255, 170, 0, 0.1);
+}
+
+.message-role {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.message-user .message-role {
+    color: var(--text-color);
+}
+
+.message-assistant .message-role {
+    color: var(--text-dim);
+}
+
+.message-content {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Input Container */
+.input-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+input[type="text"] {
+    flex: 1;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    font-family: inherit;
+    font-size: 1em;
+}
+
+input[type="text"]:focus {
+    outline: none;
+    border-color: var(--text-color);
+    box-shadow: 0 0 5px var(--text-color);
+}
+
+input[type="text"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Buttons */
+button {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+    border: none;
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+button:hover:not(:disabled) {
+    opacity: 0.8;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.primary-button {
+    background-color: var(--button-bg);
+    color: var(--button-text);
+}
+
+.secondary-button {
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.secondary-button:hover:not(:disabled) {
+    background-color: rgba(0, 255, 0, 0.1);
+}
+
+/* Session Controls */
+.session-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.session-id {
+    color: var(--text-dim);
+    font-size: 0.8em;
+    margin-left: auto;
+}
+
+/* Loading Overlay */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 14, 20, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+#loading-overlay.hidden {
+    display: none;
+}
+
+.loading-spinner {
+    border: 4px solid rgba(0, 255, 0, 0.3);
+    border-top: 4px solid var(--text-color);
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#loading-message {
+    margin-top: 20px;
+    color: var(--text-color);
+}
+
+/* Error Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 14, 20, 0.95);
+    display: flex;
+    justify-center: align-items: center;
+    z-index: 2000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: var(--input-bg);
+    border: 2px solid var(--error-color);
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-content h3 {
+    color: var(--error-color);
+    margin-bottom: 15px;
+}
+
+.modal-content p {
+    margin-bottom: 20px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--input-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-color);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .screen {
+        padding: 10px;
+    }
+
+    .terminal-header {
+        font-size: 0.9em;
+    }
+
+    .ascii-art {
+        font-size: 0.6em;
+    }
+
+    input[type="text"], button {
+        font-size: 0.9em;
+        padding: 8px;
+    }
+
+    .session-controls {
+        font-size: 0.8em;
+    }
+
+    .session-id {
+        width: 100%;
+        margin-top: 10px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .ascii-art {
+        font-size: 0.5em;
+    }
+
+    .input-container {
+        flex-direction: column;
+    }
+
+    button {
+        width: 100%;
+    }
+
+    .session-controls {
+        flex-direction: column;
+    }
+
+    .session-controls button {
+        width: 100%;
+    }
+}

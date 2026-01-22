@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Redteam CTF</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="screen">
+            <div class="terminal-header">
+                <div class="ascii-art">
+╔══════════════════════════════════════════════════════════════╗
+║         🚩 Welcome to the AI Redteam CTF Challenge! 🚩       ║
+╚══════════════════════════════════════════════════════════════╝
+                </div>
+            </div>
+            <div class="welcome-content">
+                <p>Your mission is to extract secret flags from an AI assistant using prompt injection and social engineering.</p>
+                <p>There are 5 progressively difficult stages. Good luck!</p>
+
+                <div class="name-input-container">
+                    <label for="user-name-input">Enter your name (optional):</label>
+                    <input type="text" id="user-name-input" placeholder="Anonymous" maxlength="30">
+                    <button id="start-button" class="primary-button">Start CTF</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div id="chat-screen" class="screen hidden">
+            <div class="terminal-header">
+                <div class="connection-status">⨯ ⨯ ⨯ CONNECTION ESTABLISHED ⨯ ⨯ ⨯</div>
+                <div class="stage-indicator">
+                    <span id="stage-display">STAGE 1 of 5: The Warmup (Easy)</span>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div id="messages" class="messages-container"></div>
+            </div>
+
+            <div class="input-container">
+                <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Type your message or /help for commands..."
+                    autocomplete="off"
+                    disabled
+                >
+                <button id="send-button" class="primary-button" disabled>Send</button>
+            </div>
+
+            <div class="session-controls">
+                <button id="export-session-button" class="secondary-button">Export Session</button>
+                <button id="import-session-button" class="secondary-button">Import Session</button>
+                <input type="file" id="import-file-input" accept=".json" style="display: none;">
+                <span id="session-id-display" class="session-id"></span>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="hidden">
+            <div class="loading-spinner"></div>
+            <div id="loading-message">Connecting...</div>
+        </div>
+
+        <!-- Error Modal -->
+        <div id="error-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Error</h3>
+                <p id="error-message"></p>
+                <button id="error-close-button" class="primary-button">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

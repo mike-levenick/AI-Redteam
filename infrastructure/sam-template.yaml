@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI Redteam CTF - Web Version
+
+Parameters:
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: Anthropic API key for Claude
+
+  FlagStage1:
+    Type: String
+    Description: Flag for Stage 1
+
+  FlagStage2:
+    Type: String
+    Description: Flag for Stage 2
+
+  FlagStage3:
+    Type: String
+    Description: Flag for Stage 3
+
+  FlagStage4:
+    Type: String
+    Description: Flag for Stage 4
+
+  FlagStage5:
+    Type: String
+    Description: Flag for Stage 5
+
+Resources:
+  CTFFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ai-redteam-ctf-web
+      Description: AI Redteam CTF web backend
+      Runtime: python3.11
+      Handler: lambda_handler.lambda_handler
+      CodeUri: ../lambda/
+      MemorySize: 512
+      Timeout: 900  # 15 minutes (max for Lambda)
+
+      Environment:
+        Variables:
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+          FLAG_STAGE_1: !Ref FlagStage1
+          FLAG_STAGE_2: !Ref FlagStage2
+          FLAG_STAGE_3: !Ref FlagStage3
+          FLAG_STAGE_4: !Ref FlagStage4
+          FLAG_STAGE_5: !Ref FlagStage5
+
+      FunctionUrlConfig:
+        AuthType: NONE  # Anonymous access
+        InvokeMode: RESPONSE_STREAM  # Required for SSE streaming
+        Cors:
+          AllowOrigins:
+            - "*"
+          AllowMethods:
+            - GET
+            - POST
+            - OPTIONS
+          AllowHeaders:
+            - "*"
+          MaxAge: 300
+
+Outputs:
+  ApiUrl:
+    Description: Lambda Function URL for the API
+    Value: !GetAtt CTFFunctionUrl.FunctionUrl
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+
+  FunctionName:
+    Description: Lambda Function Name
+    Value: !Ref CTFFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionName"
