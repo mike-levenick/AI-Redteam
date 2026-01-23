@@ -4,8 +4,8 @@
  */
 
 // Configuration - UPDATE THIS with your Lambda Function URL
-const API_BASE_URL = 'http://localhost:5001';  // For local development
-// const API_BASE_URL = 'YOUR_LAMBDA_FUNCTION_URL';  // For production
+// const API_BASE_URL = 'http://localhost:5001';  // For local development
+const API_BASE_URL = 'https://zkg3yyapgxftc2hgtv4rzqwmku0twunh.lambda-url.us-east-1.on.aws';  // For production
 
 class CTFClient {
     constructor() {
@@ -14,6 +14,18 @@ class CTFClient {
         this.currentStage = 1;
         this.eventSource = null;
         this.currentMessageElement = null;
+    }
+
+    // Helper to parse Lambda responses (handles both local and Lambda formats)
+    parseLambdaResponse(data) {
+        // Lambda with RESPONSE_STREAM returns {statusCode, headers, body}
+        // Local dev server returns the data directly
+        if (data.body && typeof data.body === 'string') {
+            console.log('Parsing Lambda wrapped response'); // DEBUG
+            return JSON.parse(data.body);
+        }
+        console.log('Using direct response'); // DEBUG
+        return data;
     }
 
     async createSession(userName) {
@@ -31,8 +43,11 @@ class CTFClient {
                 throw new Error('Failed to create session');
             }
 
-            const data = await response.json();
-            console.log('Session data:', data); // DEBUG
+            const rawData = await response.json();
+            console.log('Raw session data:', rawData); // DEBUG
+            const data = this.parseLambdaResponse(rawData);
+            console.log('Parsed session data:', data); // DEBUG
+
             this.sessionId = data.sessionId;
             this.userName = data.userName;
             this.currentStage = data.stage;
@@ -73,54 +88,80 @@ class CTFClient {
             throw new Error('Command failed');
         }
 
-        const data = await response.json();
-        return data;
+        const rawData = await response.json();
+        return this.parseLambdaResponse(rawData);
     }
 
     async streamResponse(message) {
-        return new Promise((resolve, reject) => {
-            const url = `${API_BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(this.sessionId)}&message=${encodeURIComponent(message)}`;
+        // Use fetch instead of EventSource for buffered SSE responses
+        const url = `${API_BASE_URL}/api/chat/stream?sessionId=${encodeURIComponent(this.sessionId)}&message=${encodeURIComponent(message)}`;
 
-            this.eventSource = new EventSource(url);
-            let fullResponse = '';
+        // Cold start timeout warning
+        const coldStartTimeout = setTimeout(() => {
+            showLoadingMessage('Waking up servers... This may take a few seconds.');
+        }, 2000);
 
-            // Cold start timeout warning
-            const coldStartTimeout = setTimeout(() => {
-                showLoadingMessage('Waking up servers... This may take a few seconds.');
-            }, 2000);
+        try {
+            const response = await fetch(url);
+            clearTimeout(coldStartTimeout);
+            hideLoadingMessage();
 
-            this.eventSource.onmessage = (event) => {
-                clearTimeout(coldStartTimeout);
-                hideLoadingMessage();
-
-                try {
-                    const chunk = JSON.parse(event.data);
-                    fullResponse += chunk;
-                    appendToCurrentMessage(chunk);
-                } catch (e) {
-                    // If parsing fails, just append the data directly
-                    fullResponse += event.data;
-                    appendToCurrentMessage(event.data);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('SESSION_EXPIRED');
                 }
-            };
+                throw new Error('Request failed');
+            }
 
-            this.eventSource.addEventListener('done', () => {
-                clearTimeout(coldStartTimeout);
-                hideLoadingMessage();
-                this.eventSource.close();
-                this.eventSource = null;
-                finishMessage();
-                resolve(fullResponse);
-            });
+            // Get the complete SSE-formatted response
+            let sseBody = await response.text();
 
-            this.eventSource.onerror = (error) => {
-                clearTimeout(coldStartTimeout);
-                hideLoadingMessage();
-                this.eventSource.close();
-                this.eventSource = null;
-                reject(new Error('Stream connection failed'));
-            };
-        });
+            // Handle Lambda wrapped response (if present)
+            // Lambda might wrap it as JSON with statusCode, headers, body
+            try {
+                const parsed = JSON.parse(sseBody);
+                if (parsed.body && typeof parsed.body === 'string') {
+                    sseBody = parsed.body;
+                }
+            } catch (e) {
+                // Not JSON, use as-is
+            }
+
+            // Parse SSE format: "data: text\n\n"
+            let fullResponse = '';
+            const lines = sseBody.split('\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+
+                if (line.startsWith('data: ')) {
+                    const data = line.substring(6); // Remove "data: " prefix
+                    try {
+                        // Try to parse as JSON (the chunk format)
+                        const chunk = JSON.parse(data);
+                        fullResponse += chunk;
+                        appendToCurrentMessage(chunk);
+                    } catch (e) {
+                        // Not JSON, append directly
+                        fullResponse += data;
+                        appendToCurrentMessage(data);
+                    }
+                } else if (line.startsWith('event: done')) {
+                    // Done event - finish
+                    break;
+                } else if (line.startsWith('event: error')) {
+                    // Error event
+                    throw new Error('Server returned an error');
+                }
+            }
+
+            finishMessage();
+            return fullResponse;
+        } catch (error) {
+            clearTimeout(coldStartTimeout);
+            hideLoadingMessage();
+            throw error;
+        }
     }
 
     async exportSession() {
@@ -134,7 +175,8 @@ class CTFClient {
             throw new Error('Failed to export session');
         }
 
-        return await response.json();
+        const rawData = await response.json();
+        return this.parseLambdaResponse(rawData);
     }
 
     async importSession(sessionData) {
@@ -148,7 +190,9 @@ class CTFClient {
             throw new Error('Failed to import session');
         }
 
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = this.parseLambdaResponse(rawData);
+
         this.sessionId = data.sessionId;
         this.userName = data.userName;
         this.currentStage = data.stage;

@@ -3,10 +3,9 @@ AI Redteam/CTF system prompt. A multi-stage CTF challenge to redteam an AI LLM.
 """
 
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Note: In Lambda, environment variables are set directly by CDK
+# No need to load from .env file
 
 # Validate that all required flags are set in environment
 REQUIRED_FLAGS = ['FLAG_STAGE_1', 'FLAG_STAGE_2', 'FLAG_STAGE_3', 'FLAG_STAGE_4', 'FLAG_STAGE_5']

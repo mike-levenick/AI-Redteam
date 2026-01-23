@@ -44,25 +44,25 @@ Replace `ACCOUNT-ID` with your AWS account ID and `REGION` with your target regi
 
 ### Step 1: Set Environment Variables
 
-Create a file `infrastructure/cdk/.env` with your configuration:
-
-```bash
-export ANTHROPIC_API_KEY="your_anthropic_api_key_here"
-export FLAG_STAGE_1="FLAG{dennis_nedry}"
-export FLAG_STAGE_2="FLAG{sudo_make_me_a_sandwich}"
-export FLAG_STAGE_3="FLAG{hidden_knowledge}"
-export FLAG_STAGE_4="FLAG{defense_in_depth}"
-export FLAG_STAGE_5="FLAG{1337_h4x0r}"
-```
-
-Then load it:
-
 ```bash
 cd infrastructure/cdk
-source .env
+
+# Load environment variables from root .env file
+source load-env.sh
 ```
 
-### Step 2: Synthesize CloudFormation Template (Optional)
+This will load your API key and flags from the `.env` file in the project root.
+
+### Step 2: Bundle Lambda Code (No Docker Required)
+
+```bash
+# Bundle Lambda code with dependencies
+./bundle-lambda.sh
+```
+
+This creates `lambda-bundle/` with all Python code and dependencies packaged together. No Docker needed!
+
+### Step 3: Synthesize CloudFormation Template (Optional)
 
 Preview what will be deployed:
 
@@ -72,7 +72,7 @@ cdk synth
 
 This generates CloudFormation templates in `cdk.out/`.
 
-### Step 3: Deploy
+### Step 4: Deploy
 
 ```bash
 cdk deploy
@@ -88,7 +88,7 @@ The deployment will:
 - Create CloudFront distribution
 - Output all URLs
 
-### Step 4: Update Frontend Configuration
+### Step 5: Update Frontend Configuration
 
 After deployment completes, you'll see outputs like:
 
@@ -112,7 +112,7 @@ cd ../..
 # const API_BASE_URL = 'https://abc123xyz.lambda-url.us-east-1.on.aws';
 ```
 
-### Step 5: Redeploy Frontend with Updated API URL
+### Step 6: Redeploy Frontend with Updated API URL
 
 ```bash
 cd infrastructure/cdk
@@ -121,7 +121,7 @@ cdk deploy
 
 This will upload the updated frontend files with the correct API endpoint.
 
-### Step 6: Access Your CTF
+### Step 7: Access Your CTF
 
 Open the CloudFront URL in your browser:
 ```
@@ -196,15 +196,19 @@ cdk deploy
 
 ## Troubleshooting
 
+### "Failed to connect to docker API"
+
+This deployment **does not require Docker**. If you see Docker errors:
+
+1. Make sure you ran `./bundle-lambda.sh` first
+2. The script bundles dependencies locally without Docker
+3. If you still see Docker errors, check that `lambda-bundle/` directory exists
+
 ### Lambda Deployment Package Too Large
 
-If you get errors about package size:
-
-```bash
-# CDK uses Docker bundling automatically
-# Make sure Docker is running
-docker ps
-```
+If you get errors about package size, the `anthropic` package might be too large. Consider:
+- Using a Lambda Layer for dependencies
+- Removing unused dependencies
 
 ### Function URL Not Working
 

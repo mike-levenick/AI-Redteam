@@ -44,6 +44,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return create_session(body_data)
 
     elif path == '/api/chat/stream' and method == 'GET':
+        # Simplified streaming - collect all chunks and return at once
         return handle_sse_stream(query_params)
 
     elif path == '/api/chat' and method == 'POST':
@@ -59,22 +60,13 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         return error_response(404, f"Not found: {method} {path}")
 
 
-def cors_headers() -> Dict[str, str]:
-    """Standard CORS headers for all responses"""
-    return {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-    }
-
-
 def success_response(data: Any, status_code: int = 200) -> Dict[str, Any]:
     """Standard success response"""
+    # Note: CORS headers are handled by Lambda Function URL config
     return {
         'statusCode': status_code,
         'headers': {
-            'Content-Type': 'application/json',
-            **cors_headers()
+            'Content-Type': 'application/json'
         },
         'body': json.dumps(data)
     }
@@ -82,11 +74,11 @@ def success_response(data: Any, status_code: int = 200) -> Dict[str, Any]:
 
 def error_response(status_code: int, message: str) -> Dict[str, Any]:
     """Standard error response"""
+    # Note: CORS headers are handled by Lambda Function URL config
     return {
         'statusCode': status_code,
         'headers': {
-            'Content-Type': 'application/json',
-            **cors_headers()
+            'Content-Type': 'application/json'
         },
         'body': json.dumps({
             'error': True,
@@ -118,7 +110,7 @@ def create_session(body: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def handle_sse_stream(query_params: Dict[str, str]) -> Dict[str, Any]:
-    """Handle SSE streaming endpoint"""
+    """Handle SSE streaming endpoint - collects chunks and returns complete SSE response"""
     session_id = query_params.get('sessionId')
     message = query_params.get('message', '')
 
@@ -137,17 +129,31 @@ def handle_sse_stream(query_params: Dict[str, str]) -> Dict[str, Any]:
     knowledge_dir = os.path.join(os.path.dirname(__file__), 'knowledge')
     llm_core = LLMCore(session, knowledge_dir=knowledge_dir)
 
-    # Stream response
-    # Note: Lambda Function URLs with response streaming expect a generator
+    # Collect all streaming chunks
+    sse_body = ""
+    try:
+        for chunk in llm_core.stream_llm_response(message):
+            sse_body += chunk
+    except Exception as e:
+        # Return error as SSE event
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache'
+            },
+            'body': f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+        }
+
+    # Return complete SSE response
+    # Note: CORS headers are handled by Lambda Function URL config
     return {
         'statusCode': 200,
         'headers': {
             'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
-            **cors_headers()
+            'Cache-Control': 'no-cache'
         },
-        'body': llm_core.stream_llm_response(message)
+        'body': sse_body
     }
 
 

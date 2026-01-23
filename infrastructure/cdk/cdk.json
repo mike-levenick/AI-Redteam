@@ -1,5 +1,6 @@
 {
   "app": "python3 app.py",
+  "toolkitStackName": "AIRedteamCDKToolkit",
   "watch": {
     "include": [
       "**"

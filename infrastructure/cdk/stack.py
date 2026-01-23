@@ -21,6 +21,21 @@ class AIRedteamCTFStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Lambda Function
+        # Uses pre-bundled code (run ./bundle-lambda.sh first)
+        # This avoids needing Docker
+        bundle_dir = os.path.join(os.path.dirname(__file__), "lambda-bundle")
+
+        # Check if bundle exists, otherwise fall back to source directory
+        if not os.path.exists(bundle_dir):
+            print("\n" + "="*70)
+            print("WARNING: lambda-bundle not found!")
+            print("Run: ./bundle-lambda.sh")
+            print("="*70 + "\n")
+            code_path = os.path.join(os.path.dirname(__file__), "../../lambda")
+        else:
+            code_path = bundle_dir
+            print(f"✓ Using bundled Lambda code from: {code_path}")
+
         ctf_function = lambda_.Function(
             self,
             "CTFFunction",
@@ -28,17 +43,7 @@ class AIRedteamCTFStack(Stack):
             description="AI Redteam CTF web backend",
             runtime=lambda_.Runtime.PYTHON_3_11,
             handler="lambda_handler.lambda_handler",
-            code=lambda_.Code.from_asset(
-                os.path.join(os.path.dirname(__file__), "../../lambda"),
-                bundling={
-                    "image": lambda_.Runtime.PYTHON_3_11.bundling_image,
-                    "command": [
-                        "bash", "-c",
-                        "pip install -r requirements.txt -t /asset-output && "
-                        "cp -r . /asset-output"
-                    ]
-                }
-            ),
+            code=lambda_.Code.from_asset(code_path),
             memory_size=512,
             timeout=Duration.minutes(15),  # Max Lambda timeout
             environment={
@@ -51,16 +56,17 @@ class AIRedteamCTFStack(Stack):
             }
         )
 
-        # Lambda Function URL with Response Streaming
+        # Lambda Function URL
         function_url = ctf_function.add_function_url(
             auth_type=lambda_.FunctionUrlAuthType.NONE,
             cors=lambda_.FunctionUrlCorsOptions(
                 allowed_origins=["*"],
-                allowed_methods=[lambda_.HttpMethod.GET, lambda_.HttpMethod.POST, lambda_.HttpMethod.OPTIONS],
+                allowed_methods=[lambda_.HttpMethod.GET, lambda_.HttpMethod.POST],
                 allowed_headers=["*"],
                 max_age=Duration.minutes(5)
-            ),
-            invoke_mode=lambda_.InvokeMode.RESPONSE_STREAM  # Required for SSE
+            )
+            # Note: Using default BUFFERED mode instead of RESPONSE_STREAM
+            # SSE will be simulated by returning complete responses
         )
 
         # S3 Bucket for Frontend
@@ -96,7 +102,7 @@ class AIRedteamCTFStack(Stack):
             self,
             "FrontendDistribution",
             default_behavior=cloudfront.BehaviorOptions(
-                origin=origins.S3Origin(frontend_bucket),
+                origin=origins.S3StaticWebsiteOrigin(frontend_bucket),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
             ),
